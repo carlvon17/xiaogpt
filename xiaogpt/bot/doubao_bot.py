@@ -30,7 +30,10 @@ class DoubaoBot(ChatHistoryMixin, BaseBot):
         model = options.pop("model")
         ms = self.get_messages()
         ms.append({"role": "user", "content": query})
-        return {"model": model, "messages": ms}
+        # 透传 thinking / extra_body / service_tier 等额外参数给 Ark SDK
+        data = {"model": model, "messages": ms}
+        data.update(options)
+        return data
 
     async def ask(self, query, **options):
         data = self._get_data(query, **options)

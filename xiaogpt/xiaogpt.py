@@ -101,7 +101,11 @@ class MiGPT:
             str(self.mi_token_home),
         )
         # Forced login to refresh to refresh token
-        await account.login("micoapi")
+        # 仅当没有缓存的 micoapi 凭证时才强制登录刷新；否则直接复用 ~/.mi.token
+        # 里的 serviceToken。这样避免触发小米风控/短信验证，也避免登录失败时
+        # miservice 原生 login 把整个 token 清空。mi_request 在 401 时会自动重登。
+        if not (account.token and "micoapi" in account.token):
+            await account.login("micoapi")
         self.mina_service = MiNAService(account)
         self.miio_service = MiIOService(account)
 
@@ -420,6 +424,13 @@ class MiGPT:
                 print(f"{self.chatbot.name} 回答出错 {str(e)}")
             else:
                 print("回答完毕")
+            # 豆包讲完后，停掉小爱挂起、会自动恢复的残留回答
+            try:
+                await self.mina_service.player_stop(self.device_id)
+                # mibrain 通道发空 TTS，清空小爱挂起的对话回答队列
+                await self.mina_service.text_to_speech(self.device_id, "")
+            except Exception as e:
+                self.log.debug("stop after speak failed: %s", e)
             if self.in_conversation:
                 print(f"继续对话，或用 `{self.config.end_conversation}` 结束对话")
                 await self.wakeup_xiaoai()
